@@ -83,18 +83,19 @@ def expected_q(parameters, state, values, shape, m):
     (matched, u_next, v_next) = transition(parameters, state, m, shape)
     u_next = np.minimum(u_next, max_u-1)
     v_next = np.minimum(v_next, max_v-1)
-    q = reward(parameters, state, matched, m) - parameters.discount * values[v_next, u_next]
+    q = reward(parameters, state, matched, m) + parameters.discount * values[v_next, u_next]
     return q.mean()
 
 
-def value_iteration(tolerance, initial_value, multipliers, parameters, shape):
+def value_iteration(tolerance, initial_value, multipliers, parameters, shape, max_iter=200, debug=False):
     v_states, u_states = initial_value.shape
     values = initial_value.copy()
     policies = np.zeros([v_states, u_states, len(multipliers)])
     policy = np.zeros([v_states, u_states])
     convergence = []
-    for k in itertools.count():
-        print("iteration: %d" % k)
+    for k in range(max_iter):
+        if debug:
+            print("iteration: %d" % k)
         new_values = values.copy()
         for v, u in itertools.product(range(v_states), range(u_states)):
             state = State(users=u, vehicles=v)
@@ -102,8 +103,10 @@ def value_iteration(tolerance, initial_value, multipliers, parameters, shape):
             idx = policies[v, u, :].squeeze().argmax()
             policy[v, u] = multipliers[idx]
             new_values[v, u] = policies[v, u, idx]
-        convergence.append(((new_values - values) ** 2).mean())
-        print("convergence distance: %0.4f" % convergence[k])
+        convergence.append(np.nan_to_num(abs(new_values - values)/values).max())
+        if debug:
+            mape = 100.0 * convergence[k]
+            print("convergence distance: %0.4f%%" % mape)
         if convergence[k] < tolerance:
             break
         values = new_values
